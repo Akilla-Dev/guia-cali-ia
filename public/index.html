@@ -29,6 +29,18 @@
     input::placeholder { color: rgba(255,255,255,.4); }
     #send { padding: 10px 20px; background: #FF6B35; border: none; border-radius: 24px; color: white; cursor: pointer; font-weight: 600; font-size: 14px; }
     #send:disabled { opacity: .5; cursor: not-allowed; }
+    .lugares-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.lugar-btn {
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1px solid #FF6B35;
+  background: transparent;
+  color: #FF6B35;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all .2s;
+}
+.lugar-btn:hover { background: #FF6B35; color: white; }
   </style>
 </head>
 <body>
@@ -54,7 +66,7 @@
     <div>¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano. ¿Qué querés hacer hoy: comer, bailar, conocer historia o explorar la naturaleza?</div>
     <div class="msg-footer">
       <span class="speaking-dot" id="dot-welcome"></span>
-      <button class="replay-btn" onclick="playVoice('¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano.', this)">🔊 Escuchar</button>
+     <button class="replay-btn" onclick="playVoice('¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano. ¿Qué querés hacer hoy: comer, bailar, conocer historia o explorar la naturaleza?', this)">🔊 Escuchar</button>
     </div>
   </div>
 </div>
@@ -76,32 +88,32 @@
     perfil = p;
   }
 
-  async function sendMsg() {
-    const input = document.getElementById('input');
-    const send  = document.getElementById('send');
-    const msg   = input.value.trim();
-    if (!msg) return;
+async function sendMsg(textoDirecto) {
+  const input = document.getElementById('input');
+  const send  = document.getElementById('send');
+  const msg   = textoDirecto || input.value.trim();
+  if (!msg) return;
 
-    input.value = '';
-    send.disabled = true;
-    addMsg(msg, 'user');
-    const loading = addMsg('Lulú está pensando...', 'bot loading');
+  input.value = '';
+  send.disabled = true;
+  addMsg(msg, 'user');
+  const loading = addMsg('Lulú está pensando...', 'bot loading');
 
-    try {
-      const res = await fetch('/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, sessionId, perfil })
-      });
-      const data = await res.json();
-      loading.remove();
-      await addBotMsg(data.response); // auto-reproduce voz
-    } catch(e) {
-      loading.remove();
-      addMsg('Uy, algo falló. Intentá de nuevo.', 'bot');
-    }
-    send.disabled = false;
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, sessionId, perfil })
+    });
+    const data = await res.json();
+    loading.remove();
+    await addBotMsg(data.response, data.lugares || []);
+  } catch(e) {
+    loading.remove();
+    addMsg('Uy, algo falló. Intentá de nuevo.', 'bot');
   }
+  send.disabled = false;
+}
 
   function addMsg(text, cls) {
     const chat = document.getElementById('chat');
@@ -113,23 +125,30 @@
     return div;
   }
 
-  async function addBotMsg(text) {
-    const chat  = document.getElementById('chat');
-    const msgId = 'msg_' + Date.now();
-    const div   = document.createElement('div');
-    div.className = 'msg bot';
-    div.innerHTML = `
-      <div>${text}</div>
-      <div class="msg-footer">
-        <span class="speaking-dot" id="dot_${msgId}"></span>
-        <button class="replay-btn" onclick="playVoice(${JSON.stringify(text)}, this)">🔊 Escuchar</button>
-      </div>`;
-    chat.appendChild(div);
-    chat.scrollTop = chat.scrollHeight;
+ async function addBotMsg(text, lugares = []) {
+  const chat  = document.getElementById('chat');
+  const msgId = 'msg_' + Date.now();
+  const div   = document.createElement('div');
+  div.className = 'msg bot';
 
-    // Reproducir automáticamente
-    await playVoice(text, null, `dot_${msgId}`);
-  }
+  // Botones de lugares
+  const lugaresHTML = lugares.length > 0
+    ? `<div class="lugares-btns">
+        ${lugares.map(l => `<button class="lugar-btn" onclick="sendMsg('${l}')">${l}</button>`).join('')}
+       </div>`
+    : '';
+
+  div.innerHTML = `
+    <div>${text}</div>
+    ${lugaresHTML}
+    <div class="msg-footer">
+      <span class="speaking-dot" id="dot_${msgId}"></span>
+      <button class="replay-btn" onclick="playVoice(${JSON.stringify(text)}, this)">🔊 Escuchar</button>
+    </div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  await playVoice(text, null, `dot_${msgId}`);
+}
 
   async function playVoice(text, btn, dotId) {
     // Detener audio anterior
@@ -162,6 +181,10 @@
 
     if (btn) { btn.disabled = false; btn.textContent = '🔊 Escuchar'; }
   }
+  // Reproducir bienvenida automáticamente al cargar
+window.addEventListener('load', () => {
+  playVoice('¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano. ¿Qué querés hacer hoy: comer, bailar, conocer historia o explorar la naturaleza?', null, 'dot-welcome');
+});
 </script>
 </body>
 </html>

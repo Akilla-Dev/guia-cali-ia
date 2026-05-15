@@ -6,7 +6,6 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
-// ── Clientes ──
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const SYSTEM_PROMPT = `Eres "Lulú", la guía turística virtual de Santiago de Cali, Colombia.
@@ -37,8 +36,30 @@ MODOS según perfil:
 
 REGLAS:
 - Nunca suenes como robot ni manual de turismo
-- Máximo 3 párrafos cortos por respuesta
+- Nunca uses emojis, el texto se convierte a voz
+- No uses asteriscos ni negritas ni guiones
+- Respuestas MUY cortas: máximo 3 oraciones, menos de 80 palabras
+- Al final de tu respuesta agrega exactamente esta línea en formato JSON:
+  LUGARES:["Nombre lugar 1","Nombre lugar 2","Nombre lugar 3"]
+- Los 3 lugares deben ser reales de Cali y relacionados con la pregunta
 - Sé honesta pero positiva sobre seguridad`;
+
+// ── Funciones de texto (deben estar antes de las rutas) ──
+function limpiarTexto(texto) {
+  if (!texto) return '';
+  return texto
+    .replace(/[\u{1F300}-\u{1FFFF}]/gu, '')
+    .replace(/[\u{2600}-\u{26FF}]/gu, '')
+    .replace(/[\u{2700}-\u{27BF}]/gu, '')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function dividirEnOraciones(texto) {
+  const partes = texto.split(/(?<=[.!?])\s+/);
+  return partes.map(s => s.trim()).filter(s => s.length > 0);
+}
 
 const conversations = {};
 
@@ -52,7 +73,7 @@ app.post('/chat', async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      systemInstruction: SYSTEM_PROMPT 
+      systemInstruction: SYSTEM_PROMPT +
         (perfil ? `\n\nPERFIL DEL TURISTA ACTUAL: ${perfil}` : '')
     });
 
@@ -60,12 +81,21 @@ app.post('/chat', async (req, res) => {
     const result = await chat.sendMessage(message);
     const responseText = result.response.text();
 
+    // Separar texto de lugares
+    const lugaresMatch = responseText.match(/LUGARES:\[.*?\]/);
+    const lugares = lugaresMatch
+      ? JSON.parse(lugaresMatch[0].replace('LUGARES:', ''))
+      : [];
+    const textoLimpio = responseText
+      .replace(/LUGARES:\[.*?\]/, '')
+      .trim();
+
     conversations[sessionId].push(
       { role: 'user',  parts: [{ text: message }] },
       { role: 'model', parts: [{ text: responseText }] }
     );
 
-    res.json({ response: responseText });
+    res.json({ response: textoLimpio, lugares });
 
   } catch (error) {
     console.error('Error Gemini:', error.message);
@@ -79,69 +109,76 @@ app.post('/chat', async (req, res) => {
 app.post('/speak', async (req, res) => {
   const { text } = req.body;
 
+  if (!text) {
+    return res.status(400).json({ error: 'No se recibió texto' });
+  }
+
+  const textoLimpio = limpiarTexto(text);
+  const oraciones = dividirEnOraciones(textoLimpio);
+  console.log('Oraciones a sintetizar:', oraciones);
+
   try {
-    const response = await fetch('https://api.inworld.ai/tts/v1/voice:stream', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${process.env.INWORLD_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        text: text,
-        voice_id: process.env.INWORLD_VOICE_ID,
-        model_id: 'inworld-tts-2',
-        language: 'es',
-        delivery_mode: 'BALANCED',
-        audio_config: {
-          audio_encoding: 'MP3',
-          speaking_rate: 1
-        }
-      })
-    });
+    const todosLosChunks = [];
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Inworld error ${response.status}: ${err}`);
-    }
+    for (const oracion of oraciones) {
+      if (!oracion.trim()) continue;
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    const audioChunks = [];
-    let buffer = '';
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const parsed = JSON.parse(trimmed);
-          console.log('Keys en result:', Object.keys(parsed.result || parsed));
-          const audioB64 =
-            parsed.result?.audio ||
-            parsed.result?.audioContent ||
-            parsed.result?.audio_content ||
-            parsed.audioContent ||
-            parsed.audio;
-          if (audioB64) {
-            audioChunks.push(Buffer.from(audioB64, 'base64'));
+      const response = await fetch('https://api.inworld.ai/tts/v1/voice:stream', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${process.env.INWORLD_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          text: oracion,
+          voice_id: process.env.INWORLD_VOICE_ID,
+          model_id: 'inworld-tts-2',
+          language: 'es',
+          delivery_mode: 'BALANCED',
+          audio_config: {
+            audio_encoding: 'MP3',
+            speaking_rate: 1
           }
-        } catch { }
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        console.error(`Error en oracion "${oracion}":`, err);
+        continue;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const parsed = JSON.parse(trimmed);
+            const audioB64 =
+              parsed.result?.audio ||
+              parsed.result?.audioContent ||
+              parsed.result?.audio_content ||
+              parsed.audioContent ||
+              parsed.audio;
+            if (audioB64) todosLosChunks.push(Buffer.from(audioB64, 'base64'));
+          } catch { }
+        }
       }
     }
 
-    if (audioChunks.length === 0) {
-      throw new Error('No se encontró audio');
-    }
+    if (todosLosChunks.length === 0) throw new Error('No se encontró audio');
 
-    const audioBuffer = Buffer.concat(audioChunks);
-    console.log(`✅ Audio generado: ${audioBuffer.length} bytes`);
+    const audioBuffer = Buffer.concat(todosLosChunks);
+    console.log(`Audio total generado: ${audioBuffer.length} bytes`);
     res.set('Content-Type', 'audio/mpeg');
     res.send(audioBuffer);
 
@@ -150,48 +187,7 @@ app.post('/speak', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 app.listen(3000, () => {
-  console.log(`✅ Lulú corriendo en http://localhost:3000`);
+  console.log('✅ Lulú corriendo en http://localhost:3000');
 });
-
-app.post('/speak', async (req, res) => {
-  const { text } = req.body;
-
-  try {
-    const response = await fetch('https://api.inworld.ai/tts/v1/voice:stream', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${process.env.INWORLD_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        voiceId: process.env.INWORLD_VOICE_ID,
-        modelId: 'inworld-tts-2',
-        text: limpiarTexto(text),
-        audioConfig: {
-          audioEncoding: 'MP3',
-          sampleRateHertz: 24000
-        }
-      })
-    });
-
-    console.log('Status Inworld:', response.status);
-    
-    const rawText = await response.text();
-    console.log('Respuesta cruda (primeros 300 chars):', rawText.substring(0, 300));
-
-    // Por ahora solo devolvemos para ver qué llega
-    res.json({ debug: rawText.substring(0, 500) });
-
-  } catch (error) {
-    console.error('Error Inworld TTS:', error.message);
-    res.status(500).json({ error: 'Error generando voz' });
-  }
-});
-
-function limpiarTexto(texto) {
-  return texto
-    .replace(/[\u{1F300}-\u{1FFFF}]/gu, '') // elimina emojis
-    .replace(/\s+/g, ' ')                    // espacios dobles
-    .trim();
-}

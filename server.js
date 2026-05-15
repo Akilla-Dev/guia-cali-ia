@@ -52,7 +52,7 @@ app.post('/chat', async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
-      systemInstruction: SYSTEM_PROMPT +
+      systemInstruction: SYSTEM_PROMPT 
         (perfil ? `\n\nPERFIL DEL TURISTA ACTUAL: ${perfil}` : '')
     });
 
@@ -80,36 +80,78 @@ app.post('/speak', async (req, res) => {
   const { text } = req.body;
 
   try {
-    const response = await fetch('https://api.inworld.ai/tts/v1/text:synthesize', {
+    const response = await fetch('https://api.inworld.ai/tts/v1/voice:stream', {
       method: 'POST',
       headers: {
         'Authorization': `Basic ${process.env.INWORLD_API_KEY}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        voiceId: process.env.INWORLD_VOICE_ID,
-        modelId: 'inworld-tts-1.5-max',
         text: text,
-        audioConfig: {
-          audioEncoding: 'MP3',
-          sampleRateHertz: 24000
+        voice_id: process.env.INWORLD_VOICE_ID,
+        model_id: 'inworld-tts-2',
+        language: 'es',
+        delivery_mode: 'BALANCED',
+        audio_config: {
+          audio_encoding: 'MP3',
+          speaking_rate: 1
         }
       })
     });
 
-    console.log('Status:', response.status);
-    const rawText = await response.text();
-    console.log('Respuesta raw:', rawText.substring(0, 400));
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Inworld error ${response.status}: ${err}`);
+    }
 
-    res.json({ debug: 'ver terminal' });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const audioChunks = [];
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const parsed = JSON.parse(trimmed);
+          console.log('Keys en result:', Object.keys(parsed.result || parsed));
+          const audioB64 =
+            parsed.result?.audio ||
+            parsed.result?.audioContent ||
+            parsed.result?.audio_content ||
+            parsed.audioContent ||
+            parsed.audio;
+          if (audioB64) {
+            audioChunks.push(Buffer.from(audioB64, 'base64'));
+          }
+        } catch { }
+      }
+    }
+
+    if (audioChunks.length === 0) {
+      throw new Error('No se encontró audio');
+    }
+
+    const audioBuffer = Buffer.concat(audioChunks);
+    console.log(`✅ Audio generado: ${audioBuffer.length} bytes`);
+    res.set('Content-Type', 'audio/mpeg');
+    res.send(audioBuffer);
 
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error Inworld TTS:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
-app.listen(process.env.PORT, () => {
-  console.log(`✅ Lulú corriendo en http://localhost:${process.env.PORT}`);
+app.listen(3000, () => {
+  console.log(`✅ Lulú corriendo en http://localhost:3000`);
 });
 
 app.post('/speak', async (req, res) => {
@@ -124,8 +166,8 @@ app.post('/speak', async (req, res) => {
       },
       body: JSON.stringify({
         voiceId: process.env.INWORLD_VOICE_ID,
-        modelId: 'inworld-tts-1.5-max',
-        text: text,
+        modelId: 'inworld-tts-2',
+        text: limpiarTexto(text),
         audioConfig: {
           audioEncoding: 'MP3',
           sampleRateHertz: 24000
@@ -146,3 +188,10 @@ app.post('/speak', async (req, res) => {
     res.status(500).json({ error: 'Error generando voz' });
   }
 });
+
+function limpiarTexto(texto) {
+  return texto
+    .replace(/[\u{1F300}-\u{1FFFF}]/gu, '') // elimina emojis
+    .replace(/\s+/g, ' ')                    // espacios dobles
+    .trim();
+}

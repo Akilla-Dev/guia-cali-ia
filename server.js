@@ -188,6 +188,105 @@ app.post('/speak', async (req, res) => {
   }
 });
 
+// ────────────────────────────────
+// CLIMA: OpenWeather + node-cron
+// ────────────────────────────────
+const cron = require('node-cron');
+
+const CALI_LAT = 3.4516;
+const CALI_LON = -76.5320;
+
+let ultimoMensajeClima = null; // evita repetir el mismo aviso
+let climaActual = null;        // estado actual para consultas
+
+async function verificarClima() {
+  try {
+    const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${CALI_LAT}&lon=${CALI_LON}&appid=${process.env.OPENWEATHER_API_KEY}&units=metric&lang=es&cnt=4`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (!data.list || data.list.length === 0) return;
+
+    // Tomar las próximas 3 horas
+    const proximo = data.list[0];
+    const descripcion = proximo.weather[0].description;
+    const temp        = Math.round(proximo.main.temp);
+    const lluvia      = proximo.weather[0].main === 'Rain' || 
+                        proximo.weather[0].main === 'Drizzle' ||
+                        proximo.weather[0].main === 'Thunderstorm';
+    const calor       = temp >= 30;
+    const fresco      = temp <= 20;
+
+    // Construir mensaje caleño según el clima
+    let mensaje = null;
+
+    if (lluvia) {
+      mensaje = `Oís, te aviso que en las próximas horas va a caer una borrasca en Cali. El cielo está ${descripcion} y la temperatura es de ${temp}°C. Mejor llevá paraguas o quedate en un café rico.`;
+    } else if (calor) {
+      mensaje = `Parcero, el sol está pegando duro hoy en Cali, ${temp}°C con cielo ${descripcion}. Hidrátate bien y si podés, buscá la sombra o tomá una lulada bien fría.`;
+    } else if (fresco) {
+      mensaje = `Qué nota, hoy Cali amanece fresquita a ${temp}°C con ${descripcion}. Perfecto para caminar por el Bulevar o subir a los cerros.`;
+    }
+
+    // Guardar clima actual para consultas manuales
+    climaActual = { descripcion, temp, lluvia, calor, fresco, timestamp: new Date() };
+
+    // Solo notificar si el mensaje cambió desde la última vez
+    if (mensaje && mensaje !== ultimoMensajeClima) {
+      ultimoMensajeClima = mensaje;
+      // Emitir a todos los clientes conectados via SSE
+      clientesSSE.forEach(clienteRes => {
+        clienteRes.write(`data: ${JSON.stringify({ tipo: 'clima', mensaje })}\n\n`);
+      });
+      console.log('Alerta clima enviada:', mensaje);
+    }
+
+  } catch (error) {
+    console.error('Error OpenWeather:', error.message);
+  }
+}
+
+// Lista de clientes SSE conectados
+const clientesSSE = new Set();
+
+app.get('/eventos', (req, res) => {
+  res.set({
+    'Content-Type':  'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection':    'keep-alive'
+  });
+  res.flushHeaders();
+  res.write(`data: ${JSON.stringify({ tipo: 'conexion', mensaje: 'Conectado' })}\n\n`);
+
+  clientesSSE.add(res);
+  console.log(`Cliente SSE conectado. Total: ${clientesSSE.size}`);
+
+  // ── Enviar el último clima conocido inmediatamente al conectarse ──
+  if (ultimoMensajeClima) {
+    res.write(`data: ${JSON.stringify({ tipo: 'clima', mensaje: ultimoMensajeClima })}\n\n`);
+  }
+
+  req.on('close', () => {
+    clientesSSE.delete(res);
+  });
+});
+
+// Ruta para consultar clima manualmente
+app.get('/clima', async (req, res) => {
+  if (!climaActual) await verificarClima();
+  res.json(climaActual);
+});
+
+// Verificar clima al arrancar el servidor
+verificarClima();
+
+// Verificar cada 30 minutos
+cron.schedule('*/30 * * * *', () => {
+  console.log('Verificando clima de Cali...');
+  verificarClima();
+});
+
+
 app.listen(3000, () => {
   console.log('✅ Lulú corriendo en http://localhost:3000');
 });

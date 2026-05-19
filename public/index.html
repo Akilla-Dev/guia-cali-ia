@@ -1,225 +1,302 @@
 <!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lulú — Tu Guía de Cali</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; background: #1a0a2e; color: white; height: 100vh; display: flex; flex-direction: column; }
-    header { background: #FF6B35; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
-    header h1 { font-size: 18px; }
-    header p  { font-size: 12px; opacity: .8; }
-    .perfil-bar { background: #2d1b4e; padding: 10px 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .perfil-btn { padding: 5px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,.3); background: transparent; color: white; cursor: pointer; font-size: 12px; transition: all .2s; }
-    .perfil-btn.active { background: #FF6B35; border-color: #FF6B35; }
-    .chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-    .msg { max-width: 82%; padding: 12px 16px; border-radius: 16px; line-height: 1.6; font-size: 14px; }
-    .msg.user    { background: #FF6B35; align-self: flex-end; border-radius: 16px 16px 4px 16px; }
-    .msg.bot     { background: #2d1b4e; align-self: flex-start; border-radius: 16px 16px 16px 4px; }
-    .msg.loading { opacity: .6; font-style: italic; }
-    .msg-footer  { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-    .replay-btn  { padding: 3px 10px; border-radius: 10px; border: none; background: rgba(255,107,53,.25); color: #FF6B35; cursor: pointer; font-size: 11px; }
-    .replay-btn:hover { background: rgba(255,107,53,.4); }
-    .speaking-dot { width: 8px; height: 8px; border-radius: 50%; background: #FF6B35; animation: pulse 1s infinite; display: none; }
-    .speaking-dot.active { display: inline-block; }
-    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
-    .input-bar { padding: 12px 20px; background: #2d1b4e; display: flex; gap: 8px; }
-    input { flex: 1; padding: 10px 16px; border-radius: 24px; border: none; background: rgba(255,255,255,.1); color: white; font-size: 14px; outline: none; }
-    input::placeholder { color: rgba(255,255,255,.4); }
-    #send { padding: 10px 20px; background: #FF6B35; border: none; border-radius: 24px; color: white; cursor: pointer; font-weight: 600; font-size: 14px; }
-    #send:disabled { opacity: .5; cursor: not-allowed; }
-    .lugares-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.lugar-btn {
-  padding: 5px 12px;
-  border-radius: 16px;
-  border: 1px solid #FF6B35;
-  background: transparent;
-  color: #FF6B35;
-  cursor: pointer;
-  font-size: 11px;
-  transition: all .2s;
-}
-.lugar-btn:hover { background: #FF6B35; color: white; }
-  </style>
-</head>
-<body>
-
-<header>
-  <div style="font-size:32px">🌺</div>
-  <div>
-    <h1>Lulú — Tu guía de Cali</h1>
-    <p>¡Bienvenido, parcero! ¿Qué querés conocer hoy?</p>
-  </div>
-</header>
-
-<div class="perfil-bar">
-  <span style="font-size:12px;opacity:.7">Soy turista:</span>
-  <button class="perfil-btn active" onclick="setPerfil(this,'Cultural/Salsa')">💃 Salsero/a</button>
-  <button class="perfil-btn" onclick="setPerfil(this,'Gastronomía')">🍽️ Foodie</button>
-  <button class="perfil-btn" onclick="setPerfil(this,'Naturaleza')">🦜 Naturaleza</button>
-  <button class="perfil-btn" onclick="setPerfil(this,'Turismo Médico')">🏥 Salud</button>
-</div>
-
-<div class="chat-box" id="chat">
-  <div class="msg bot">
-    <div>¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano. ¿Qué querés hacer hoy: comer, bailar, conocer historia o explorar la naturaleza?</div>
-    <div class="msg-footer">
-      <span class="speaking-dot" id="dot-welcome"></span>
-     <button class="replay-btn" onclick="playVoice('¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano. ¿Qué querés hacer hoy: comer, bailar, conocer historia o explorar la naturaleza?', this)">🔊 Escuchar</button>
+  <html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lulú — Tu Guía de Cali</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: sans-serif; background: #1a0a2e; color: white; height: 100vh; display: flex; flex-direction: column; }
+      header { background: #FF6B35; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+      header h1 { font-size: 18px; }
+      header p  { font-size: 12px; opacity: .8; }
+      .perfil-bar { background: #2d1b4e; padding: 10px 20px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      .perfil-btn { padding: 5px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,.3); background: transparent; color: white; cursor: pointer; font-size: 12px; transition: all .2s; }
+      .perfil-btn.active { background: #FF6B35; border-color: #FF6B35; }
+      .chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+      .msg { max-width: 82%; padding: 12px 16px; border-radius: 16px; line-height: 1.6; font-size: 14px; }
+      .msg.user    { background: #FF6B35; align-self: flex-end; border-radius: 16px 16px 4px 16px; }
+      .msg.bot     { background: #2d1b4e; align-self: flex-start; border-radius: 16px 16px 16px 4px; }
+      .msg.loading { opacity: .6; font-style: italic; }
+      .msg-footer  { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+      .replay-btn  { padding: 3px 10px; border-radius: 10px; border: none; background: rgba(255,107,53,.25); color: #FF6B35; cursor: pointer; font-size: 11px; }
+      .replay-btn:hover { background: rgba(255,107,53,.4); }
+      .speaking-dot { width: 8px; height: 8px; border-radius: 50%; background: #FF6B35; animation: pulse 1s infinite; display: none; }
+      .speaking-dot.active { display: inline-block; }
+      @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+      .input-bar { padding: 12px 20px; background: #2d1b4e; display: flex; gap: 8px; }
+      input { flex: 1; padding: 10px 16px; border-radius: 24px; border: none; background: rgba(255,255,255,.1); color: white; font-size: 14px; outline: none; }
+      input::placeholder { color: rgba(255,255,255,.4); }
+      #send { padding: 10px 20px; background: #FF6B35; border: none; border-radius: 24px; color: white; cursor: pointer; font-weight: 600; font-size: 14px; }
+      #send:disabled { opacity: .5; cursor: not-allowed; }
+      .lugares-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .lugar-btn {
+    padding: 5px 12px;
+    border-radius: 16px;
+    border: 1px solid #FF6B35;
+    background: transparent;
+    color: #FF6B35;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all .2s;
+  }
+  .lugar-btn:hover { background: #FF6B35; color: white; }
+    </style>
+  </head>
+  <body>
+  <!-- Pantalla selección de idioma -->
+  <div id="lang-screen" style="
+    position: fixed; inset: 0; background: #1a0a2e;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 24px; z-index: 100;
+  ">
+    <div style="font-size: 48px">🌺</div>
+    <h2 style="font-size: 22px; font-weight: 500; color: white; text-align: center;">
+      Lulú — Tu Guía de Cali
+    </h2>
+    <p style="font-size: 14px; color: rgba(255,255,255,.6); text-align: center;">
+      Selecciona tu idioma / Choose your language
+    </p>
+    <div style="display: flex; gap: 16px; margin-top: 8px;">
+      <button onclick="seleccionarIdioma('es')" style="
+        padding: 14px 32px; border-radius: 24px; border: none;
+        background: #FF6B35; color: white; font-size: 16px;
+        cursor: pointer; font-weight: 500;
+      ">Español</button>
+      <button onclick="seleccionarIdioma('en')" style="
+        padding: 14px 32px; border-radius: 24px; border: 2px solid #FF6B35;
+        background: transparent; color: #FF6B35; font-size: 16px;
+        cursor: pointer; font-weight: 500;
+      ">English</button>
     </div>
   </div>
-</div>
+  <header>
+    <div style="font-size:32px">🌺</div>
+    <div>
+      <h1>Lulú — Tu guía de Cali</h1>
+      <p>¡Bienvenido, parcero! ¿Qué querés conocer hoy?</p>
+    </div>
+  </header>
 
-<div class="input-bar">
-  <input id="input" type="text" placeholder="Pregúntale a Lulú..."
-         onkeydown="if(event.key==='Enter') sendMsg()"/>
-  <button id="send" onclick="sendMsg()">Enviar</button>
-</div>
+  <div class="perfil-bar">
+    <span style="font-size:12px;opacity:.7">Soy turista:</span>
+    <button class="perfil-btn active" onclick="setPerfil(this,'Cultural/Salsa')">💃 Salsero/a</button>
+    <button class="perfil-btn" onclick="setPerfil(this,'Gastronomía')">🍽️ Foodie</button>
+    <button class="perfil-btn" onclick="setPerfil(this,'Naturaleza')">🦜 Naturaleza</button>
+    <button class="perfil-btn" onclick="setPerfil(this,'Turismo Médico')">🏥 Salud</button>
+  </div>
 
-<script>
-  const sessionId = 'session_' + Date.now();
-let perfil = 'Cultural/Salsa';
-let currentAudio = null;
-let bienvenidaTerminada = false;
-let bienvenidaPromise = null;
-let bienvenidaResolve = null;
+  <div class="chat-box" id="chat">
+    <div class="msg bot">
+      <div>¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano. ¿Qué querés hacer hoy: comer, bailar, conocer historia o explorar la naturaleza?</div>
+      <div class="msg-footer">
+        <span class="speaking-dot" id="dot-welcome"></span>
+      <button class="replay-btn" onclick="playVoice('¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano. ¿Qué querés hacer hoy: comer, bailar, conocer historia o explorar la naturaleza?', this)">🔊 Escuchar</button>
+      </div>
+    </div>
+  </div>
 
-function setPerfil(btn, p) {
-  document.querySelectorAll('.perfil-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  perfil = p;
-}
+  <div class="input-bar">
+    <input id="input" type="text" placeholder="Pregúntale a Lulú..."
+          onkeydown="if(event.key==='Enter') sendMsg()"/>
+    <button id="send" onclick="sendMsg()">Enviar</button>
+  </div>
 
-async function sendMsg(textoDirecto) {
-  const input = document.getElementById('input');
-  const send  = document.getElementById('send');
-  const msg   = textoDirecto || input.value.trim();
-  if (!msg) return;
+  <script>
 
-  input.value = '';
-  send.disabled = true;
-  addMsg(msg, 'user');
-  const loading = addMsg('Lulú está pensando...', 'bot loading');
+    let idioma = 'es'
+    const sessionId = 'session_' + Date.now();
+  let perfil = 'Cultural/Salsa';
+  let currentAudio = null;
+  let bienvenidaTerminada = false;
+  let bienvenidaPromise = null;
+  let bienvenidaResolve = null;
 
-  try {
-    const res = await fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, sessionId, perfil })
-    });
-    const data = await res.json();
-    loading.remove();
-    await addBotMsg(data.response, data.lugares || []);
-  } catch(e) {
-    loading.remove();
-    addMsg('Uy, algo falló. Intentá de nuevo.', 'bot');
-  }
-  send.disabled = false;
-}
+  //cambio de idioma
 
-function addMsg(text, cls) {
-  const chat = document.getElementById('chat');
-  const div  = document.createElement('div');
-  div.className = 'msg ' + cls;
-  div.textContent = text;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-  return div;
-}
+  function seleccionarIdioma(lang) {
+    idioma = lang;
+    document.getElementById('lang-screen').style.display = 'none';
 
-async function addBotMsg(text, lugares = []) {
-  const chat  = document.getElementById('chat');
-  const msgId = 'msg_' + Date.now();
-  const div   = document.createElement('div');
-  div.className = 'msg bot';
+    // Actualizar textos de la interfaz
+    if (lang === 'en') {
+      document.querySelector('header h1').textContent = "Lulú — Your Cali Guide";
+      document.querySelector('header p').textContent = "Welcome! What would you like to explore?";
+      document.querySelector('#input').placeholder = "Ask Lulú anything...";
+      document.querySelector('#send').textContent = "Send";
+      document.querySelectorAll('.perfil-btn')[0].textContent = "💃 Salsa";
+      document.querySelectorAll('.perfil-btn')[1].textContent = "🍽️ Foodie";
+      document.querySelectorAll('.perfil-btn')[2].textContent = "🦜 Nature";
+      document.querySelectorAll('.perfil-btn')[3].textContent = "🏥 Health";
+    }
 
-  const lugaresHTML = lugares.length > 0
-    ? `<div class="lugares-btns">
-        ${lugares.map(l => `<button class="lugar-btn" onclick="sendMsg('${l}')">${l}</button>`).join('')}
-       </div>`
-    : '';
-
-  div.innerHTML = `
-    <div>${text}</div>
-    ${lugaresHTML}
-    <div class="msg-footer">
-      <span class="speaking-dot" id="dot_${msgId}"></span>
-      <button class="replay-btn" onclick="playVoice(${JSON.stringify(text)}, this)">🔊 Escuchar</button>
-    </div>`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-  await playVoice(text, null, `dot_${msgId}`);
-}
-
-async function playVoice(text, btn, dotId) {
-  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
-
-  const dot = dotId ? document.getElementById(dotId) : null;
-  if (dot) dot.classList.add('active');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
-
-  try {
-    const res = await fetch('/speak', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
-    if (!res.ok) throw new Error();
-
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-
-    await new Promise((resolve, reject) => {
-      currentAudio = new Audio(url);
-      currentAudio.onended = () => {
-        if (dot) dot.classList.remove('active');
-        currentAudio = null;
-        resolve();
-      };
-      currentAudio.onerror = reject;
-      currentAudio.play();
-    });
-
-  } catch(e) {
-    console.error('Error voz:', e);
-    if (dot) dot.classList.remove('active');
+    // Arrancar SSE y bienvenida en el idioma correcto
+    iniciarApp();
   }
 
-  if (btn) { btn.disabled = false; btn.textContent = '🔊 Escuchar'; }
-}
+  function iniciarApp() {
+    const mensajeBienvenida = idioma === 'en'
+      ? "Hey there, welcome to Cali! I am Lulú, your personal guide to the most vibrant city in Colombia. What would you like to do today: eat, dance, explore history or enjoy nature?"
+      : "¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano. ¿Qué querés hacer hoy: comer, bailar, conocer historia o explorar la naturaleza?";
 
-// ── SSE ──
-const eventSource = new EventSource(`/eventos?sessionId=${sessionId}`);
+    const eventSource = new EventSource(`/eventos?sessionId=${sessionId}`);
+    bienvenidaPromise = new Promise(resolve => { bienvenidaResolve = resolve; });
 
-// Promesa que se resuelve cuando la bienvenida termina
-bienvenidaPromise = new Promise(resolve => { bienvenidaResolve = resolve; });
+    eventSource.onmessage = async (e) => {
+      const data = JSON.parse(e.data);
 
-eventSource.onmessage = async (e) => {
-  const data = JSON.parse(e.data);
+      if (data.tipo === 'conexion') {
+        await playVoice(mensajeBienvenida, null, 'dot-welcome');
+        bienvenidaTerminada = true;
+        bienvenidaResolve();
+      }
 
-  if (data.tipo === 'conexion') {
-    // Reproducir bienvenida y cuando termine resolver la promesa
-    await playVoice(
-      '¡Oís, bienvenido a Cali! Soy Lulú y conozco esta ciudad como la palma de mi mano. ¿Qué querés hacer hoy: comer, bailar, conocer historia o explorar la naturaleza?',
-      null,
-      'dot-welcome'
-    );
-    bienvenidaTerminada = true;
-    bienvenidaResolve(); // bienvenida terminó
+      if (data.tipo === 'clima') {
+        await bienvenidaPromise;
+        const mensajeClima = idioma === 'en'
+          ? await traducirClima(data.mensaje)
+          : data.mensaje;
+        await addBotMsg(mensajeClima, []);
+      }
+    };
+
+    eventSource.onerror = () => {
+      if (bienvenidaResolve) bienvenidaResolve();
+    };
   }
 
-  if (data.tipo === 'clima') {
-    // Esperar a que la bienvenida termine antes de reproducir el clima
-    await bienvenidaPromise;
-    await addBotMsg(data.mensaje, []);
+  async function traducirClima(texto) {
+    // Pedirle a Gemini que traduzca el mensaje del clima
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Translate this weather alert to English keeping Lulú's warm personality: "${texto}"`,
+          sessionId: 'clima_' + Date.now(),
+          perfil,
+          idioma: 'en'
+        })
+      });
+      const data = await res.json();
+      return data.response;
+    } catch {
+      return texto;
+    }
   }
-};
 
-eventSource.onerror = () => {
-  console.log('SSE desconectado');
-  if (bienvenidaResolve) bienvenidaResolve();
-};
-</script>
-</body>
-</html>
+
+
+
+
+  function setPerfil(btn, p) {
+    document.querySelectorAll('.perfil-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    perfil = p;
+  }
+
+  async function sendMsg(textoDirecto) {
+    const input = document.getElementById('input');
+    const send  = document.getElementById('send');
+    const msg   = textoDirecto || input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+    send.disabled = true;
+    addMsg(msg, 'user');
+    const loading = addMsg('Lulú está pensando...', 'bot loading');
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, sessionId, perfil,idioma })
+      });
+      const data = await res.json();
+      loading.remove();
+      await addBotMsg(data.response, data.lugares || []);
+    } catch(e) {
+      loading.remove();
+      addMsg('Uy, algo falló. Intentá de nuevo.', 'bot');
+    }
+    send.disabled = false;
+  }
+
+  function addMsg(text, cls) {
+    const chat = document.getElementById('chat');
+    const div  = document.createElement('div');
+    div.className = 'msg ' + cls;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  async function addBotMsg(text, lugares = []) {
+    const chat  = document.getElementById('chat');
+    const msgId = 'msg_' + Date.now();
+    const div   = document.createElement('div');
+    div.className = 'msg bot';
+
+    const lugaresHTML = lugares.length > 0
+      ? `<div class="lugares-btns">
+          ${lugares.map(l => `<button class="lugar-btn" onclick="sendMsg('${l}')">${l}</button>`).join('')}
+        </div>`
+      : '';
+
+    div.innerHTML = `
+      <div>${text}</div>
+      ${lugaresHTML}
+      <div class="msg-footer">
+        <span class="speaking-dot" id="dot_${msgId}"></span>
+        <button class="replay-btn" onclick="playVoice(${JSON.stringify(text)}, this)">🔊 Escuchar</button>
+      </div>`;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    await playVoice(text, null, `dot_${msgId}`);
+  }
+
+  async function playVoice(text, btn, dotId) {
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+
+    const dot = dotId ? document.getElementById(dotId) : null;
+    if (dot) dot.classList.add('active');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
+
+    try {
+      const res = await fetch('/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      if (!res.ok) throw new Error();
+
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+
+      await new Promise((resolve, reject) => {
+        currentAudio = new Audio(url);
+        currentAudio.onended = () => {
+          if (dot) dot.classList.remove('active');
+          currentAudio = null;
+          resolve();
+        };
+        currentAudio.onerror = reject;
+        currentAudio.play();
+      });
+
+    } catch(e) {
+      console.error('Error voz:', e);
+      if (dot) dot.classList.remove('active');
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '🔊 Escuchar'; }
+  }
+
+
+
+  // Promesa que se resuelve cuando la bienvenida termina
+  </script>
+  </body>
+  </html>

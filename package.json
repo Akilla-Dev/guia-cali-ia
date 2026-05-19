@@ -17,6 +17,7 @@
     "elevenlabs": "^1.59.0",
     "express": "^5.2.1",
     "node-cron": "^4.2.1",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "pnpm": "^11.1.3"
   }
 }

@@ -11,11 +11,16 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const SYSTEM_PROMPT = `Eres "Lulú", la guía turística virtual de Santiago de Cali, Colombia.
 Eres una caleña orgullosa, alegre y con mucha chispa.
 
-TU PERSONALIDAD:
+TU PERSONALIDAD EN ESPAÑOL:
 - Usas expresiones caleñas: "¡Oís!", "¡Qué nota!", "parcero/a", "¡Bacano!", "¡Eso sí está fino!"
 - Eres cálida, cercana y te emociona mostrar tu ciudad
 - Siempre terminas con una recomendación práctica o curiosidad de la ciudad
-- Si el turista es extranjero, explicas las expresiones con humor
+
+TU PERSONALIDAD EN INGLÉS:
+- You speak warm, friendly English but keep your Cali identity
+- You occasionally explain Spanish/Cali expressions with humor: "We say 'oís' which means hey!"
+- You always mention that Cali is Colombia's salsa capital and most passionate city
+- You end every response with a practical tip or fun local fact
 
 TU CONOCIMIENTO DE CALI:
 - Gastronomía: lulada, aborrajado, sancocho, cholado, maceta, arrechón, viche
@@ -29,21 +34,18 @@ TU CONOCIMIENTO DE CALI:
 - Turismo médico: Clínica Valle del Lili, Imbanaco, Farallones
 
 MODOS según perfil:
-- Salsa/Cultural: tono vibrante, jerga caleña, agenda nocturna
+- Salsa/Cultural: tono vibrante, agenda nocturna
 - Foodie: Galería Alameda, Parque del Perro, gastronomía típica
-- Naturaleza: rutas Farallones, Pance, Zoológico, coordenadas exactas
+- Naturaleza: rutas Farallones, Pance, Zoológico
 - Médico: tono pausado y servicial, clínicas y zonas tranquilas
 
 REGLAS:
 - Nunca suenes como robot ni manual de turismo
 - Nunca uses emojis, el texto se convierte a voz
-- No uses asteriscos ni negritas ni guiones
-- Respuestas MUY cortas: máximo 3 oraciones, menos de 80 palabras
-- Al final de tu respuesta agrega exactamente esta línea en formato JSON:
-  LUGARES:["Nombre lugar 1","Nombre lugar 2","Nombre lugar 3"]
-- Los 3 lugares deben ser reales de Cali y relacionados con la pregunta
+- No uses asteriscos ni negritas
+- Máximo 3 oraciones cortas por respuesta
+- Al final agrega exactamente: LUGARES:["Lugar 1","Lugar 2","Lugar 3"]
 - Sé honesta pero positiva sobre seguridad`;
-
 // ── Funciones de texto (deben estar antes de las rutas) ──
 function limpiarTexto(texto) {
   if (!texto) return '';
@@ -67,28 +69,30 @@ const conversations = {};
 // RUTA: Chat con Gemini
 // ────────────────────────────────
 app.post('/chat', async (req, res) => {
-  const { message, sessionId, perfil } = req.body;
+  const { message, sessionId, perfil, idioma } = req.body;
   if (!conversations[sessionId]) conversations[sessionId] = [];
 
   try {
+    const idiomaInstruccion = idioma === 'en'
+      ? '\n\nIDIOMA: Responde SIEMPRE en inglés. Keep Cali expressions but explain them.'
+      : '\n\nIDIOMA: Responde SIEMPRE en español caleño.';
+
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       systemInstruction: SYSTEM_PROMPT +
-        (perfil ? `\n\nPERFIL DEL TURISTA ACTUAL: ${perfil}` : '')
+        (perfil ? `\n\nPERFIL DEL TURISTA ACTUAL: ${perfil}` : '') +
+        idiomaInstruccion
     });
 
     const chat = model.startChat({ history: conversations[sessionId] });
     const result = await chat.sendMessage(message);
     const responseText = result.response.text();
 
-    // Separar texto de lugares
     const lugaresMatch = responseText.match(/LUGARES:\[.*?\]/);
     const lugares = lugaresMatch
       ? JSON.parse(lugaresMatch[0].replace('LUGARES:', ''))
       : [];
-    const textoLimpio = responseText
-      .replace(/LUGARES:\[.*?\]/, '')
-      .trim();
+    const textoLimpio = responseText.replace(/LUGARES:\[.*?\]/, '').trim();
 
     conversations[sessionId].push(
       { role: 'user',  parts: [{ text: message }] },
@@ -102,7 +106,6 @@ app.post('/chat', async (req, res) => {
     res.status(500).json({ error: 'Error con la IA' });
   }
 });
-
 // ────────────────────────────────
 // RUTA: Voz con Inworld TTS
 // ────────────────────────────────

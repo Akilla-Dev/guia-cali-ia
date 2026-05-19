@@ -41,6 +41,14 @@
     transition: all .2s;
   }
   .lugar-btn:hover { background: #FF6B35; color: white; }
+    #mic-btn.listening {
+  background: #FF6B35;
+  animation: pulse-mic 1.5s infinite;
+  }
+  @keyframes pulse-mic {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+  }
     </style>
   </head>
   <body>
@@ -98,10 +106,15 @@
   </div>
 
   <div class="input-bar">
-    <input id="input" type="text" placeholder="Pregúntale a Lulú..."
-          onkeydown="if(event.key==='Enter') sendMsg()"/>
-    <button id="send" onclick="sendMsg()">Enviar</button>
-  </div>
+  <button id="mic-btn" style="
+  padding: 10px 16px; background: rgba(255,255,255,.1);
+  border: none; border-radius: 50%; color: white;
+  cursor: pointer; font-size: 20px; transition: all .3s;
+">🎤</button>
+  <input id="input" type="text" placeholder="Pregúntale a Lulú..."
+         onkeydown="if(event.key==='Enter') sendMsg()"/>
+  <button id="send" onclick="sendMsg()">Enviar</button>
+</div>
 
   <script>
 
@@ -129,6 +142,8 @@
       document.querySelectorAll('.perfil-btn')[1].textContent = "🍽️ Foodie";
       document.querySelectorAll('.perfil-btn')[2].textContent = "🦜 Nature";
       document.querySelectorAll('.perfil-btn')[3].textContent = "🏥 Health";
+    }else{
+       document.querySelector('#input').placeholder = "Pregúntale a Lulú...";
     }
 
     // Arrancar SSE y bienvenida en el idioma correcto
@@ -297,6 +312,105 @@
 
 
   // Promesa que se resuelve cuando la bienvenida termina
+// ── Grabación de voz con MediaRecorder + Groq Whisper ──
+let mediaRecorder = null;
+let audioChunks = [];
+let isListening = false;
+let streamActivo = null;
+
+async function toggleMic() {
+  if (isListening) {
+    detenerGrabacion();
+  } else {
+    await iniciarGrabacion();
+  }
+}
+
+async function iniciarGrabacion() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    streamActivo = stream;
+    audioChunks = [];
+
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      await transcribirAudio(audioBlob);
+
+      // Detener el stream del micrófono
+      streamActivo.getTracks().forEach(t => t.stop());
+      streamActivo = null;
+    };
+
+    mediaRecorder.start();
+    isListening = true;
+
+    const btn = document.getElementById('mic-btn');
+    btn.classList.add('listening');
+    btn.textContent = '⏹️';
+    document.getElementById('input').placeholder = idioma === 'en'
+      ? 'Recording... tap to stop'
+      : 'Grabando... toca para parar';
+
+  } catch(e) {
+    console.error('Error micrófono:', e);
+    alert(idioma === 'en'
+      ? 'Could not access microphone. Please allow microphone access.'
+      : 'No se pudo acceder al micrófono. Permitir acceso en el navegador.');
+  }
+}
+
+function detenerGrabacion() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+  isListening = false;
+
+  const btn = document.getElementById('mic-btn');
+  btn.classList.remove('listening');
+  btn.textContent = '🎤';
+  document.getElementById('input').placeholder = idioma === 'en'
+    ? 'Ask Lulú anything...'
+    : 'Pregúntale a Lulú...';
+}
+
+async function transcribirAudio(audioBlob) {
+  const btn = document.getElementById('mic-btn');
+  btn.textContent = '⏳';
+  btn.disabled = true;
+
+  try {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'audio.webm');
+    formData.append('idioma', idioma);
+
+    const res = await fetch('/transcribir', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!res.ok) throw new Error('Error transcribiendo');
+    const data = await res.json();
+
+    if (data.texto && data.texto.trim()) {
+      document.getElementById('input').value = data.texto;
+      await sendMsg(data.texto);
+    }
+
+  } catch(e) {
+    console.error('Error transcripción:', e);
+  }
+
+  btn.textContent = '🎤';
+  btn.disabled = false;
+}
+
+document.getElementById('mic-btn').addEventListener('click', toggleMic);
   </script>
   </body>
   </html>

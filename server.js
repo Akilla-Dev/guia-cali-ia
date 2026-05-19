@@ -6,6 +6,9 @@ const app = express();
 app.use(express.json());
 app.use(express.static('public'));
 
+const Groq = require('groq-sdk');
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const SYSTEM_PROMPT = `Eres "Lulú", la guía turística virtual de Santiago de Cali, Colombia.
@@ -64,6 +67,36 @@ function dividirEnOraciones(texto) {
 }
 
 const conversations = {};
+
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post('/transcribir', upload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file) throw new Error('No se recibió audio');
+
+    // Convertir buffer a File para Groq
+    const audioFile = new File(
+      [req.file.buffer],
+      'audio.webm',
+      { type: req.file.mimetype }
+    );
+
+    const transcripcion = await groq.audio.transcriptions.create({
+      file: audioFile,
+      model: 'whisper-large-v3-turbo',
+      language: req.body.idioma === 'en' ? 'en' : 'es',
+      response_format: 'json'
+    });
+
+    console.log('Transcripción:', transcripcion.text);
+    res.json({ texto: transcripcion.text });
+
+  } catch (error) {
+    console.error('Error Groq Whisper:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ────────────────────────────────
 // RUTA: Chat con Gemini
@@ -135,7 +168,7 @@ app.post('/speak', async (req, res) => {
         body: JSON.stringify({
           text: oracion,
           voice_id: process.env.INWORLD_VOICE_ID,
-          model_id: 'inworld-tts-2',
+          model_id: 'inworld-tts-1.5-max',
           language: 'es',
           delivery_mode: 'BALANCED',
           audio_config: {
@@ -237,7 +270,7 @@ async function verificarClima() {
       });
       console.log('Alerta clima:', mensaje);
     }
-
+    
   } catch (error) {
     console.error('Error verificarClima:', error.message);
   }
@@ -278,7 +311,7 @@ app.get('/clima', async (req, res) => {
 verificarClima();
 
 // Verificar cada 30 minutos
-cron.schedule('*/5 * * * *', () => {
+cron.schedule('*/15 * * * *', () => {
   console.log('Verificando clima de Cali...');
   verificarClima();
 });
